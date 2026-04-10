@@ -5,16 +5,12 @@
 extern "C" {
 #include <quickjs.h>
 }
-struct JSMallocState;
 
-/**
- * KhromiumMem.cpp에 구현된 실제 할당 함수들입니다.
- * 컴파일러가 요구하는 JSMallocState* 타입을 사용하도록 선언합니다.
- */
+// quickjs-ng uses void* for the opaque allocator state parameter in JSMallocFunctions.
 extern "C" {
-    void* custom_js_malloc(JSMallocState* s, size_t size);
-    void  custom_js_free(JSMallocState* s, void* ptr);
-    void* custom_js_realloc(JSMallocState* s, void* ptr, size_t size);
+    void* custom_js_malloc(void* opaque, size_t size);
+    void  custom_js_free(void* opaque, void* ptr);
+    void* custom_js_realloc(void* opaque, void* ptr, size_t size);
     size_t custom_js_malloc_usable_size(const void *ptr);
 }
 
@@ -35,21 +31,16 @@ Java_io_github_jwyoon1220_khromium_js_QuickJSEngine_initRuntime(JNIEnv *env, job
 
     std::cout << "Init Runtime" << std::endl;
 
-    /**
-     * [수정 핵심 1] 에러 메시지에 따라 js_calloc은 제거합니다.
-     * [수정 핵심 2] 캐스팅 시 첫 번째 인자를 (JSMallocState *)로 정확히 맞춥니다.
-     */
-    mf_safe.js_malloc = static_cast<void *(*)(JSMallocState *, size_t)>(custom_js_malloc);
-    mf_safe.js_free   = static_cast<void (*)(JSMallocState *, void *)>(custom_js_free);
-    mf_safe.js_realloc = static_cast<void *(*)(JSMallocState *, void *, size_t)>(custom_js_realloc);
-    mf_safe.js_malloc_usable_size = static_cast<size_t (*)(const void *)>(custom_js_malloc_usable_size);
+    // quickjs-ng JSMallocFunctions uses void* opaque — assign directly without cast
+    mf_safe.js_malloc             = custom_js_malloc;
+    mf_safe.js_free               = custom_js_free;
+    mf_safe.js_realloc            = custom_js_realloc;
+    mf_safe.js_malloc_usable_size = custom_js_malloc_usable_size;
 
     std::cout << "Creating Runtime..." << std::endl;
-    // 런타임 생성
     rt = JS_NewRuntime2(&mf_safe, nullptr);
     if (!rt) return JNI_FALSE;
     std::cout << "Creating Context..." << std::endl;
-    // 컨텍스트 생성
     ctx = JS_NewContext(rt);
     if (!ctx) {
         std::cout << "Failed" << std::endl;

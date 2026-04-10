@@ -4,9 +4,12 @@ project(KhromiumCore)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_C_STANDARD 11)
 
+# Position-independent code is required when linking static libs into a shared library
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 include(FetchContent)
 
-# 1. Fetch TLSF
+# 1. Fetch TLSF (header-only style: include + compile the .c directly)
 FetchContent_Declare(
     tlsf
     GIT_REPOSITORY https://github.com/mattconte/tlsf.git
@@ -27,7 +30,11 @@ FetchContent_MakeAvailable(quickjs)
 find_package(JNI REQUIRED)
 include_directories(${JNI_INCLUDE_DIRS})
 
-# Our wrapper library
-add_library(KhromiumCore SHARED KhromiumMem.cpp QuickJSBridge.cpp)
+# Our wrapper library — include TLSF source directly to avoid missing -ltlsf
+add_library(KhromiumCore SHARED
+    KhromiumMem.cpp
+    QuickJSBridge.cpp
+    ${tlsf_SOURCE_DIR}/tlsf.c
+)
 target_include_directories(KhromiumCore PRIVATE ${tlsf_SOURCE_DIR})
-target_link_libraries(KhromiumCore PRIVATE qjs tlsf)
+target_link_libraries(KhromiumCore PRIVATE qjs)
