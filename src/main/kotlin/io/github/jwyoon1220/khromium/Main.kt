@@ -1,5 +1,6 @@
 package io.github.jwyoon1220.khromium
 
+import io.github.jwyoon1220.khromium.core.SecurityBreachException
 import io.github.jwyoon1220.khromium.core.KProcess
 import io.github.jwyoon1220.khromium.core.NativeMemoryManager
 import io.github.jwyoon1220.khromium.core.PhysicalMemoryManager
@@ -78,6 +79,19 @@ fun createRendererTab(process: KProcess, sharedCache: SharedBytecodeCache): JPan
                 outputArea.text = baos.toString()
             }
             
+        } catch (e: SecurityBreachException) {
+            // Canary corruption / overflow attack detected in this tab's VMM.
+            // The runtime has already destroyed the tab's process; display the
+            // security alert here — other tabs are completely unaffected.
+            outputArea.text = buildString {
+                appendLine("⚠  SECURITY BREACH — TAB TERMINATED")
+                appendLine("═".repeat(60))
+                appendLine()
+                appendLine(e.message)
+                appendLine()
+                appendLine("The tab's VMM has been torn down.")
+                appendLine("All other tabs and the Khromium kernel continue running.")
+            }
         } catch (e: Exception) {
             outputArea.text = "Kernel Panic: \n${e.stackTraceToString()}"
         }

@@ -1,7 +1,9 @@
 package io.github.jwyoon1220.khromium.js
 
 import io.github.jwyoon1220.khromium.core.KProcess
+import io.github.jwyoon1220.khromium.core.SecurityBreachException
 import java.security.MessageDigest
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -15,6 +17,11 @@ import java.util.concurrent.atomic.AtomicInteger
  *
  * Thread safety: [execute] is synchronized on the shared engine singleton to serialise calls
  * against the underlying C++ global context.
+ *
+ * Security: if a [SecurityBreachException] is raised (canary corruption, heap-spray, …)
+ * the runtime calls [close] to destroy the tab's VMM before re-throwing.  The exception
+ * propagates to the tab's UI boundary where only that tab is terminated; all other tabs
+ * and the kernel continue running undisturbed.
  */
 class KhromiumJsRuntime(
     val tabId: String,
@@ -38,6 +45,9 @@ class KhromiumJsRuntime(
         }
     }
 
+    /** Guards against double-close (e.g. explicit close() followed by use{} cleanup). */
+    private val closed = AtomicBoolean(false)
+
     init {
         acquireEngine()
     }
@@ -48,22 +58,39 @@ class KhromiumJsRuntime(
      * Cache hit  → returns the previously computed result from [SharedBytecodeCache]
      *              (no QuickJS invocation).
      * Cache miss → evaluates via QuickJS, stores the result, and returns it.
+     *
+     * If a [SecurityBreachException] is detected during execution (canary corruption /
+     * overflow attack), the tab's VMM is destroyed immediately and the exception is
+     * re-thrown so the tab-boundary UI can display the security incident and stop
+     * processing — without affecting any other tab.
      */
     fun execute(script: String): String {
         val hash   = md5Hex(script)
         val cached = sharedCache.getCached(hash)
         if (cached != null) return cached
 
-        val result = synchronized(engine) { engine.eval(script) }
-        sharedCache.putCache(hash, result)
-        return result
+        return try {
+            val result = synchronized(engine) { engine.eval(script) }
+            sharedCache.putCache(hash, result)
+            result
+        } catch (e: SecurityBreachException) {
+            // Overflow / heap-spray detected in this tab's VMM.
+            // Destroy the tab immediately to contain the damage, then re-throw
+            // so the UI layer can show the security alert for this tab only.
+            close()
+            throw e
+        }
     }
 
     /**
      * Releases the QuickJS engine reference and frees all VMM pages belonging
      * to this tab's private virtual address space.
+     *
+     * Idempotent — safe to call multiple times (e.g. from both [execute] and the
+     * Kotlin [use] block's implicit finally).
      */
     override fun close() {
+        if (closed.getAndSet(true)) return
         releaseEngine()
         process.destroy()
     }
