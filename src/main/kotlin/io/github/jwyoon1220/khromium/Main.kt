@@ -35,7 +35,7 @@ class MemoryVisualizer(val memory: PhysicalMemoryManager) : JPanel() {
     }
 }
 
-fun createRendererTab(process: KProcess): JPanel {
+fun createRendererTab(process: KProcess, sharedCache: SharedBytecodeCache): JPanel {
     val panel = JPanel(BorderLayout())
     val htmlArea = JTextArea(
         """<html>
@@ -62,11 +62,10 @@ fun createRendererTab(process: KProcess): JPanel {
             val htmlParser = HTMLParser(htmlTokens)
             val domRoot = HTMLDOMBuilder(process.allocator).visit(htmlParser.document())
 
-            // 2. JavaScript Execution Phase (QuickJS Engine natively over TLSF)
-            val engine = QuickJSEngine()
-            if (engine.initRuntime()) {
-                val result = engine.eval(jsArea.text)
-                
+            // 2. JavaScript Execution Phase (KhromiumJsRuntime with AOT cache)
+            KhromiumJsRuntime(process.pid.toString(), process, sharedCache).use { runtime ->
+                val result = runtime.execute(jsArea.text)
+
                 // 3. Debug Output
                 val oldOut = System.out
                 val baos = java.io.ByteArrayOutputStream()
@@ -77,10 +76,6 @@ fun createRendererTab(process: KProcess): JPanel {
                 println(result)
                 System.setOut(oldOut)
                 outputArea.text = baos.toString()
-                
-                engine.destroyRuntime()
-            } else {
-                outputArea.text = "Failed to initialize QuickJS native runtime!"
             }
             
         } catch (e: Exception) {
@@ -121,10 +116,13 @@ fun createComponentTab(process: KProcess): JPanel {
 }
 
 fun main() {
-    // Shared Physical RAM (16MB)
-    val pmm = PhysicalMemoryManager(16)
+    // Shared Physical RAM (64MB – sized to accommodate two 10 MB private heaps + 4 MB shared cache)
+    val pmm = PhysicalMemoryManager(64)
 
     NativeMemoryManager.initHeap(16L * 1024L * 1024L)
+
+    // Shared bytecode/result cache backed by Shared VMM (AOT cache for JS scripts)
+    val sharedCache = SharedBytecodeCache(pmm)
 
     val frame = JFrame("Khromium Engine v2.3 - Multiprocess Architecture")
     frame.layout = BorderLayout()
@@ -141,7 +139,7 @@ fun main() {
 
     // Process 2: The HTML/JS Engine Demo
     val proc2 = KProcess(pmm)
-    tabbedPane.addTab("Process 2: Browser Engine", createRendererTab(proc2))
+    tabbedPane.addTab("Process 2: Browser Engine", createRendererTab(proc2, sharedCache))
 
     frame.add(tabbedPane, BorderLayout.CENTER)
 
