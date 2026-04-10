@@ -43,8 +43,8 @@ class KhromiumJsRuntime(
             return try {
                 System.loadLibrary("KhromiumCore")
                 QuickJSEngine()
-            } catch (_: UnsatisfiedLinkError) {
-                println("INFO: KhromiumCore native library not found — using NashornEngine fallback.")
+            } catch (e: UnsatisfiedLinkError) {
+                println("INFO: KhromiumCore native library not found (${e.message}) — using NashornEngine fallback.")
                 NashornEngine()
             }
         }

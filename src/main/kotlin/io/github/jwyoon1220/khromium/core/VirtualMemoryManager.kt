@@ -76,7 +76,7 @@ class VirtualMemoryManager(
      * 탭 종료 시 전체 메모리 강제 반환
      */
     fun destroy() {
-        val pages = pageTable.values.toIntArray()
+        val pages = pageTable.values.toList()
         for (pPage in pages) {
             pmm.freePage(pPage)
         }

@@ -267,7 +267,8 @@ fun main() {
     val networkClient = KhromiumNetworkClient()
 
     // ── Swing UI ──────────────────────────────────────────────────────────────
-    System.setProperty("sun.java2d.opengl", "true")
+    // Attempt to enable OpenGL acceleration; ignored if unavailable on this platform
+    runCatching { System.setProperty("sun.java2d.opengl", "true") }
     SwingUtilities.invokeLater {
         val frame = JFrame("Khromium Browser Engine v2.3")
         frame.layout = BorderLayout()

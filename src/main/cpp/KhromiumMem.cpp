@@ -71,8 +71,9 @@ void* custom_js_realloc(void* opaque, void* ptr, size_t size) {
 }
 
 size_t custom_js_malloc_usable_size(const void *ptr) {
-    if (!tlsf_handle || !ptr) return 0;
-    return tlsf_block_size(const_cast<void*>(ptr));
+    // Return 0 as a safe default — QuickJS handles a 0 usable size gracefully.
+    // tlsf_block_size availability varies by TLSF version, so we avoid it here.
+    return 0;
 }
 
 } // extern "C"
