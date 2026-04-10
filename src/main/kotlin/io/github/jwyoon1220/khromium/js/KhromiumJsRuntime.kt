@@ -2,6 +2,7 @@ package io.github.jwyoon1220.khromium.js
 
 import io.github.jwyoon1220.khromium.core.KProcess
 import java.security.MessageDigest
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Per-tab JavaScript runtime wrapper.
@@ -23,19 +24,17 @@ class KhromiumJsRuntime(
 
     companion object {
         // Shared engine – the C++ QuickJS runtime is a process-wide singleton.
-        private val engine = QuickJSEngine()
-        private var refCount = 0
+        private val engine   = QuickJSEngine()
+        private val refCount = AtomicInteger(0)
 
         @Synchronized
         private fun acquireEngine() {
-            if (refCount == 0) engine.initRuntime()
-            refCount++
+            if (refCount.getAndIncrement() == 0) engine.initRuntime()
         }
 
         @Synchronized
         private fun releaseEngine() {
-            refCount--
-            if (refCount == 0) engine.destroyRuntime()
+            if (refCount.decrementAndGet() == 0) engine.destroyRuntime()
         }
     }
 

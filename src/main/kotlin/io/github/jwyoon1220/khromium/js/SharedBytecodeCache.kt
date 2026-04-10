@@ -82,7 +82,11 @@ class SharedBytecodeCache(
             allocator.malloc(entrySize)
         } catch (_: OutOfMemoryError) {
             evictExpired()
-            return
+            try {
+                allocator.malloc(entrySize)
+            } catch (_: OutOfMemoryError) {
+                return
+            }
         }
         sharedVmm.writeLong(addr + TIMESTAMP_OFFSET, System.currentTimeMillis())
         sharedVmm.writeInt(addr + DATA_SIZE_OFFSET, bytes.size)

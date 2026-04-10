@@ -5,8 +5,6 @@ import io.github.jwyoon1220.khromium.core.NativeMemoryManager
 import io.github.jwyoon1220.khromium.core.PhysicalMemoryManager
 import io.github.jwyoon1220.khromium.dom.*
 import io.github.jwyoon1220.khromium.js.*
-import io.github.jwyoon1220.khromium.js.KhromiumJsRuntime
-import io.github.jwyoon1220.khromium.js.SharedBytecodeCache
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 import java.awt.*
