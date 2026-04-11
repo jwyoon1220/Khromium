@@ -31,6 +31,12 @@ dependencies {
     // Source: https://mvnrepository.com/artifact/org.jsoup/jsoup
     implementation("org.jsoup:jsoup:1.18.3")
 
+    // Logging — SLF4J API + Logback Classic (Minecraft Fabric style)
+    // Source: https://mvnrepository.com/artifact/org.slf4j/slf4j-api
+    implementation("org.slf4j:slf4j-api:2.0.17")
+    // Source: https://mvnrepository.com/artifact/ch.qos.logback/logback-classic
+    runtimeOnly("ch.qos.logback:logback-classic:1.5.18")
+
     // ANTLR 4
     antlr("org.antlr:antlr4:4.13.1")
     implementation("org.antlr:antlr4-runtime:4.13.1")
