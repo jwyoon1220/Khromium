@@ -2,13 +2,11 @@ package io.github.jwyoon1220.khromium.ui
 
 import io.github.jwyoon1220.khromium.core.KProcess
 import io.github.jwyoon1220.khromium.core.SecurityBreachException
-import io.github.jwyoon1220.khromium.dom.HTMLDOMBuilder
+import io.github.jwyoon1220.khromium.dom.JsoupDOMBuilder
 import io.github.jwyoon1220.khromium.dom.KDOM
 import io.github.jwyoon1220.khromium.js.KhromiumJsRuntime
 import io.github.jwyoon1220.khromium.js.SharedBytecodeCache
 import io.github.jwyoon1220.khromium.net.KhromiumNetworkClient
-import org.antlr.v4.runtime.CharStreams
-import org.antlr.v4.runtime.CommonTokenStream
 import java.awt.*
 import java.util.ArrayDeque
 import javax.swing.*
@@ -160,11 +158,8 @@ class BrowserTab(
     }
 
     private fun parseAndRender(html: String) {
-        // 1. Parse HTML → KDOM in VMM
-        val lexer   = io.github.jwyoon1220.khromium.dom.HTMLLexer(CharStreams.fromString(html))
-        val tokens  = CommonTokenStream(lexer)
-        val parser  = io.github.jwyoon1220.khromium.dom.HTMLParser(tokens)
-        val domRoot = HTMLDOMBuilder(process.allocator).visit(parser.document())
+        // 1. Parse HTML → KDOM in VMM (Jsoup handles DOCTYPE, comments, implied tags, etc.)
+        val domRoot = JsoupDOMBuilder.parse(html, process.allocator)
 
         // 2. Extract <style> CSS from DOM
         val css = extractStyleTag(domRoot)

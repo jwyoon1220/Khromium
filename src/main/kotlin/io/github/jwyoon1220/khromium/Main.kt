@@ -5,8 +5,6 @@ import io.github.jwyoon1220.khromium.dom.*
 import io.github.jwyoon1220.khromium.js.*
 import io.github.jwyoon1220.khromium.net.KhromiumNetworkClient
 import io.github.jwyoon1220.khromium.ui.BrowserTab
-import org.antlr.v4.runtime.CharStreams
-import org.antlr.v4.runtime.CommonTokenStream
 import java.awt.*
 import java.awt.event.ActionEvent
 import javax.swing.*
@@ -77,11 +75,8 @@ if (title) {
 
     runBtn.addActionListener {
         try {
-            // 1. Parse HTML → DOM in VMM
-            val lexer   = HTMLLexer(CharStreams.fromString(htmlArea.text))
-            val tokens  = CommonTokenStream(lexer)
-            val parser  = HTMLParser(tokens)
-            val domRoot = HTMLDOMBuilder(process.allocator).visit(parser.document())
+            // 1. Parse HTML → KDOM in VMM (Jsoup handles full HTML5 syntax)
+            val domRoot = JsoupDOMBuilder.parse(htmlArea.text, process.allocator)
 
             // 2. Execute JavaScript via KhromiumJsRuntime (auto-selects QuickJS or Nashorn)
             KhromiumJsRuntime(process.pid.toString(), process, sharedCache, domRoot).use { runtime ->
