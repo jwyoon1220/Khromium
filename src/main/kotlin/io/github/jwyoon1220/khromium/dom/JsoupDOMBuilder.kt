@@ -42,12 +42,17 @@ object JsoupDOMBuilder {
     private fun buildNode(node: Node, allocator: VMMAllocator): Long = when (node) {
         is Element  -> buildElement(node, allocator)
         is DataNode -> {
-            // Raw content of <script>, <style>, <template>, etc. — preserve exactly.
+            // Raw character data for <script>, <style>, <template>, etc.
+            // Use wholeData to preserve exact content (CSS rules, JS code).
+            // Blank-only data nodes (e.g. empty style blocks) are skipped.
             val text = node.wholeData
             if (text.isBlank()) 0L else KDOM.createTextNode(allocator, text)
         }
         is TextNode -> {
-            // Regular text content — preserve whitespace so <pre> and inline CSS work.
+            // Regular visible text content.
+            // Use wholeText to preserve intra-node whitespace for elements like <pre>.
+            // Whitespace-only text nodes (indentation, line breaks between tags) are skipped
+            // to keep the VMM DOM lean, consistent with the previous HTMLDOMBuilder behaviour.
             val text = node.wholeText
             if (text.isBlank()) 0L else KDOM.createTextNode(allocator, text)
         }
