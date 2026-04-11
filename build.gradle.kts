@@ -27,6 +27,9 @@ dependencies {
     // Cross-platform JavaScript engine fallback (JDK-21 compatible, no GraalVM required)
     // Source: https://mvnrepository.com/artifact/org.openjdk.nashorn/nashorn-core
     implementation("org.openjdk.nashorn:nashorn-core:15.6")
+    // HTML parser — replaces the hand-rolled ANTLR HTML grammar
+    // Source: https://mvnrepository.com/artifact/org.jsoup/jsoup
+    implementation("org.jsoup:jsoup:1.18.3")
 
     // ANTLR 4
     antlr("org.antlr:antlr4:4.13.1")

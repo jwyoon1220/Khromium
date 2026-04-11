@@ -2,12 +2,8 @@ package io.github.jwyoon1220.khromium
 
 import io.github.jwyoon1220.khromium.core.KProcess
 import io.github.jwyoon1220.khromium.core.PhysicalMemoryManager
-import io.github.jwyoon1220.khromium.dom.HTMLDOMBuilder
-import io.github.jwyoon1220.khromium.dom.HTMLLexer
-import io.github.jwyoon1220.khromium.dom.HTMLParser
+import io.github.jwyoon1220.khromium.dom.JsoupDOMBuilder
 import io.github.jwyoon1220.khromium.js.*
-import org.antlr.v4.runtime.CharStreams
-import org.antlr.v4.runtime.CommonTokenStream
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -59,12 +55,8 @@ class JsEngineAndDomBridgeTest {
 
     // ── DomBridge ─────────────────────────────────────────────────────────────
 
-    private fun parseDom(html: String, process: KProcess): Long {
-        val lexer  = HTMLLexer(CharStreams.fromString(html))
-        val tokens = CommonTokenStream(lexer)
-        val parser = HTMLParser(tokens)
-        return HTMLDOMBuilder(process.allocator).visit(parser.document())
-    }
+    private fun parseDom(html: String, process: KProcess): Long =
+        JsoupDOMBuilder.parse(html, process.allocator)
 
     @Test
     fun `DomBridge getElementById finds element by id attribute`() {
