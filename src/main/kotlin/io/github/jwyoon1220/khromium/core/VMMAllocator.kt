@@ -1,5 +1,7 @@
 package io.github.jwyoon1220.khromium.core
 
+import org.slf4j.LoggerFactory
+
 /**
  * A First-Fit memory allocator that operates on top of VirtualMemoryManager.
  * It manages a contiguous block of virtual memory (the "heap").
@@ -45,6 +47,8 @@ class VMMAllocator(
         // If either field is modified the tab is considered compromised.
         private const val CANARY_MAGIC: Int  = 0x7F454C46           // 0x7F 'E' 'L' 'F'
         private const val CANARY_GUARD: Long = 0x4B48524F4D49554DL  // "KHROMIUM"
+
+        private val log = LoggerFactory.getLogger(VMMAllocator::class.java)
     }
 
     init {
@@ -75,6 +79,8 @@ class VMMAllocator(
             val status    = readStatus(current)
 
             if (blockSize <= 0) {
+                log.warn("SECURITY: Heap corruption detected at 0x{} — block size {}",
+                    current.toString(16), blockSize)
                 throw IllegalStateException("Heap corruption at 0x${current.toString(16)}")
             }
 
@@ -122,6 +128,7 @@ class VMMAllocator(
         val status     = readStatus(headerAddr)
 
         if (status != STATUS_ALLOC) {
+            log.warn("SECURITY: Double free or corruption detected at 0x{}", payloadAddr.toString(16))
             throw IllegalStateException("Double free or corruption at 0x${payloadAddr.toString(16)}")
         }
 
@@ -153,6 +160,10 @@ class VMMAllocator(
         val magic = vmm.readInt(canaryAddr)
         val guard = vmm.readLong(canaryAddr + 4)
         if (magic != CANARY_MAGIC || guard != CANARY_GUARD) {
+            log.error(
+                "SECURITY: Heap canary corruption at 0x{} — buffer-overflow/heap-spray attack detected. Tab terminated.",
+                canaryAddr.toString(16)
+            )
             throw SecurityBreachException(
                 "Heap canary corruption at 0x${canaryAddr.toString(16)}: " +
                 "expected [magic=0x${CANARY_MAGIC.toUInt().toString(16)} | " +

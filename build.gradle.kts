@@ -35,7 +35,11 @@ dependencies {
     // Source: https://mvnrepository.com/artifact/org.slf4j/slf4j-api
     implementation("org.slf4j:slf4j-api:2.0.17")
     // Source: https://mvnrepository.com/artifact/ch.qos.logback/logback-classic
-    runtimeOnly("ch.qos.logback:logback-classic:1.5.18")
+    implementation("ch.qos.logback:logback-classic:1.5.18")
+
+    // Modern Swing look-and-feel (FlatLaf dark theme)
+    // Source: https://mvnrepository.com/artifact/com.formdev/flatlaf
+    implementation("com.formdev:flatlaf:3.5.4")
 
     // ANTLR 4
     antlr("org.antlr:antlr4:4.13.1")

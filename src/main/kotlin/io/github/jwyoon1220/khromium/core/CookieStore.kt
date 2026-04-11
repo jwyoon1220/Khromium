@@ -1,6 +1,7 @@
 package io.github.jwyoon1220.khromium.core
 
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap
+import org.slf4j.LoggerFactory
 
 /**
  * CookieStore implements the Khromium spec's §9.2 "struct-layout based cookie isolation".
@@ -38,6 +39,8 @@ class CookieStore(
 
         private const val FLAG_SECURE        = 1
         private const val FLAG_HTTP_ONLY     = 2
+
+        private val log = LoggerFactory.getLogger(CookieStore::class.java)
     }
 
     private val vmm       = VirtualMemoryManager(pmm, VirtualMemoryManager.VMMType.SHARED)
@@ -95,6 +98,11 @@ class CookieStore(
             val storedFrom    = vmm.readString(storedFromPtr)
 
             if (!domainsMatch(storedFrom, requestingDomain)) {
+                log.warn(
+                    "SECURITY: Cookie domain mismatch — stored='{}', requested='{}'. " +
+                    "Potential cross-site cookie theft. Access denied.",
+                    storedFrom, requestingDomain
+                )
                 throw SecurityBreachException(
                     "Cookie domain mismatch: stored='$storedFrom', " +
                     "requested='$requestingDomain' — potential cross-site cookie theft. Denied."

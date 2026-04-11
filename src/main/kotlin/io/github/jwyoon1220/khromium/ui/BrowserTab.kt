@@ -184,7 +184,16 @@ class BrowserTab(
 
     private fun showErrorPage(message: String) {
         val escaped = message.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        parseAndRender("<html><body><h2>Error</h2><pre>$escaped</pre></body></html>")
+        try {
+            parseAndRender("<html><body><h2>Error</h2><pre>$escaped</pre></body></html>")
+        } catch (e: Exception) {
+            // Allocator may be in a bad state (e.g. after a prior crash) — fall back to a
+            // plain-text label so the AWT thread never dies with an unhandled exception.
+            SwingUtilities.invokeLater {
+                renderer.setDom(0L)   // clear stale DOM
+                renderer.repaint()
+            }
+        }
     }
 
     private fun stopLoad() {
