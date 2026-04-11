@@ -40,6 +40,11 @@ Java_io_github_jwyoon1220_khromium_js_QuickJSEngine_initRuntime(JNIEnv *env, job
     std::cout << "Creating Runtime..." << std::endl;
     rt = JS_NewRuntime2(&mf_safe, nullptr);
     if (!rt) return JNI_FALSE;
+    // Limit the QuickJS interpreter stack to 4 MB so that complex real-world
+    // scripts throw a recoverable JavaScript "Maximum call stack size exceeded"
+    // error instead of overflowing the native C stack and triggering a Windows
+    // STATUS_STACK_BUFFER_OVERRUN crash (0xC0000409).
+    JS_SetMaxStackSize(rt, 4 * 1024 * 1024);
     std::cout << "Creating Context..." << std::endl;
     ctx = JS_NewContext(rt);
     if (!ctx) {

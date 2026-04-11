@@ -4,6 +4,10 @@ import io.github.jwyoon1220.khromium.core.KProcess
 import io.github.jwyoon1220.khromium.core.SecurityBreachException
 import org.slf4j.LoggerFactory
 import java.security.MessageDigest
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -40,6 +44,29 @@ class KhromiumJsRuntime(
         private val refCount = AtomicInteger(0)
         private val log = LoggerFactory.getLogger(KhromiumJsRuntime::class.java)
 
+        /**
+         * Single-threaded executor dedicated to all QuickJS JNI calls.
+         *
+         * QuickJS captures the calling thread's native stack-top address inside
+         * JS_NewRuntime2 and uses it to detect stack overflows at eval time.
+         * If initRuntime() runs on thread A but eval() later runs on thread B
+         * (a different khromium-loader thread), the captured stack-top is invalid
+         * for thread B — causing a Windows STATUS_STACK_BUFFER_OVERRUN crash
+         * (exit code -1073740791 / 0xC0000409).
+         *
+         * Pinning every QuickJS JNI call to this single 8 MB-stack thread ensures
+         * the stack-top reference is always valid for subsequent eval() calls.
+         *
+         * NashornEngine is JVM-managed and does not need a dedicated native thread.
+         */
+        private val quickJsExecutor: ExecutorService? =
+            if (engine is QuickJSEngine) {
+                Executors.newSingleThreadExecutor { r ->
+                    Thread(null, r, "quickjs-worker", 8L * 1024 * 1024)
+                        .also { it.isDaemon = true }
+                }
+            } else null
+
         /** Picks QuickJSEngine if the native library is available, else falls back to Nashorn. */
         private fun selectEngine(): KhromiumScriptEngine {
             return try {
@@ -53,12 +80,34 @@ class KhromiumJsRuntime(
 
         @Synchronized
         private fun acquireEngine() {
-            if (refCount.getAndIncrement() == 0) engine.initRuntime()
+            if (refCount.getAndIncrement() == 0) {
+                val ex = quickJsExecutor
+                if (ex != null) {
+                    try {
+                        ex.submit { engine.initRuntime() }.get()
+                    } catch (e: ExecutionException) {
+                        throw RuntimeException("QuickJS initRuntime failed", e.cause ?: e)
+                    }
+                } else {
+                    engine.initRuntime()
+                }
+            }
         }
 
         @Synchronized
         private fun releaseEngine() {
-            if (refCount.decrementAndGet() == 0) engine.destroyRuntime()
+            if (refCount.decrementAndGet() == 0) {
+                val ex = quickJsExecutor
+                if (ex != null) {
+                    try {
+                        ex.submit { engine.destroyRuntime() }.get()
+                    } catch (e: ExecutionException) {
+                        log.warn("QuickJS destroyRuntime failed: {}", (e.cause ?: e).message)
+                    }
+                } else {
+                    engine.destroyRuntime()
+                }
+            }
         }
     }
 
@@ -90,14 +139,27 @@ class KhromiumJsRuntime(
         if (cached != null) return cached
 
         return try {
-            val result = synchronized(engine) {
-                // Bind DOM bridge when using the Nashorn engine and a DOM root is available
-                if (engine is NashornEngine && domRoot != 0L) {
-                    val bridge = DomBridge(process.allocator, domRoot)
-                    engine.bindGlobal("document", bridge)
-                    engine.bindGlobal("console", SimpleConsole())
+            val result: String = if (quickJsExecutor != null) {
+                // QuickJS: eval must run on the same thread that called initRuntime()
+                // so that QuickJS's captured stack_top is valid for the overflow check.
+                try {
+                    quickJsExecutor.submit(Callable { engine.eval(script) }).get()
+                } catch (e: ExecutionException) {
+                    val cause = e.cause
+                    if (cause is SecurityBreachException) throw cause
+                    if (cause is RuntimeException) throw cause
+                    throw RuntimeException("QuickJS eval failed", cause ?: e)
                 }
-                engine.eval(script)
+            } else {
+                synchronized(engine) {
+                    // Bind DOM bridge when using the Nashorn engine and a DOM root is available
+                    if (engine is NashornEngine && domRoot != 0L) {
+                        val bridge = DomBridge(process.allocator, domRoot)
+                        engine.bindGlobal("document", bridge)
+                        engine.bindGlobal("console", SimpleConsole())
+                    }
+                    engine.eval(script)
+                }
             }
             sharedCache.putCache(hash, result)
             result
@@ -110,16 +172,19 @@ class KhromiumJsRuntime(
     }
 
     /**
-     * Releases the engine reference and frees all VMM pages belonging
-     * to this tab's private virtual address space.
+     * Releases the engine reference.
      *
      * Idempotent — safe to call multiple times (e.g. from both [execute] and the
      * Kotlin [use] block's implicit finally).
+     *
+     * NOTE: The [KProcess] / VMM lifetime is intentionally NOT managed here.
+     * Destroying the process's VMM after every script run would tear down the
+     * KDOM that [KhromiumRenderer] still needs.  Process cleanup is the
+     * responsibility of the owning [io.github.jwyoon1220.khromium.ui.BrowserTab].
      */
     override fun close() {
         if (closed.getAndSet(true)) return
         releaseEngine()
-        process.destroy()
     }
 
     // --- helpers ---
