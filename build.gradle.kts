@@ -13,6 +13,7 @@ repositories {
 
 dependencies {
     testImplementation(kotlin("test"))
+    testImplementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
     // Source: https://mvnrepository.com/artifact/it.unimi.dsi/fastutil
     implementation("it.unimi.dsi:fastutil:8.5.18")
     // Source: https://mvnrepository.com/artifact/org.ow2.asm/asm
@@ -23,7 +24,10 @@ dependencies {
     implementation("org.apache.commons:commons-collections4:4.4")
     // Source: https://mvnrepository.com/artifact/com.google.guava/guava
     implementation("com.google.guava:guava:33.5.0-jre")
-    
+    // Cross-platform JavaScript engine fallback (JDK-21 compatible, no GraalVM required)
+    // Source: https://mvnrepository.com/artifact/org.openjdk.nashorn/nashorn-core
+    implementation("org.openjdk.nashorn:nashorn-core:15.6")
+
     // ANTLR 4
     antlr("org.antlr:antlr4:4.13.1")
     implementation("org.antlr:antlr4-runtime:4.13.1")
@@ -40,7 +44,7 @@ tasks.register<Exec>("buildNativeDLL") {
     if (isWin) {
         commandLine("powershell", "-ExecutionPolicy", "Bypass", "-File", "${rootDir}/build_native.ps1")
     } else {
-        commandLine("bash", "-c", "echo 'Implement me for non-windows'") // 확정성 consideration
+        commandLine("bash", "-c", "${rootDir}/build_native.sh")
     }
 }
 
@@ -50,6 +54,7 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 }
 
 tasks.named<JavaExec>("run") {
+    jvmArgs("-XX:+UseZGC", "-Xmx512m")
     systemProperty("java.library.path", file("build/native").absolutePath)
 }
 
