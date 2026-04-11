@@ -6,11 +6,11 @@ extern "C" {
 #include <quickjs.h>
 }
 
-// quickjs-ng uses void* for the opaque allocator state parameter in JSMallocFunctions.
+// quickjs-ng JSMallocFunctions uses JSMallocState* for the opaque allocator state parameter.
 extern "C" {
-    void* custom_js_malloc(void* opaque, size_t size);
-    void  custom_js_free(void* opaque, void* ptr);
-    void* custom_js_realloc(void* opaque, void* ptr, size_t size);
+    void* custom_js_malloc(JSMallocState* s, size_t size);
+    void  custom_js_free(JSMallocState* s, void* ptr);
+    void* custom_js_realloc(JSMallocState* s, void* ptr, size_t size);
     size_t custom_js_malloc_usable_size(const void *ptr);
 }
 
@@ -31,7 +31,7 @@ Java_io_github_jwyoon1220_khromium_js_QuickJSEngine_initRuntime(JNIEnv *env, job
 
     std::cout << "Init Runtime" << std::endl;
 
-    // quickjs-ng JSMallocFunctions uses void* opaque — assign directly without cast
+    // quickjs-ng JSMallocFunctions uses JSMallocState* — assign directly without cast
     mf_safe.js_malloc             = custom_js_malloc;
     mf_safe.js_free               = custom_js_free;
     mf_safe.js_realloc            = custom_js_realloc;

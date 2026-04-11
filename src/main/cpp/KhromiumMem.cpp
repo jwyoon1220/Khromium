@@ -3,6 +3,10 @@
 #include <cstring>
 #include <tlsf.h>
 
+extern "C" {
+#include <quickjs.h>
+}
+
 static void* tlsf_memory_pool = nullptr;
 static tlsf_t tlsf_handle = nullptr;
 
@@ -55,17 +59,17 @@ Java_io_github_jwyoon1220_khromium_core_NativeMemoryManager_writeByte(JNIEnv *en
 }
 
 // QuickJS custom allocator functions.
-// quickjs-ng uses void* opaque (not JSMallocState*) in its JSMallocFunctions.
-void* custom_js_malloc(void* opaque, size_t size) {
+// JSMallocFunctions uses JSMallocState* as the opaque parameter type.
+void* custom_js_malloc(JSMallocState* s, size_t size) {
     if (!tlsf_handle) return nullptr;
     return tlsf_malloc(tlsf_handle, size);
 }
 
-void custom_js_free(void* opaque, void* ptr) {
+void custom_js_free(JSMallocState* s, void* ptr) {
     if (tlsf_handle && ptr) tlsf_free(tlsf_handle, ptr);
 }
 
-void* custom_js_realloc(void* opaque, void* ptr, size_t size) {
+void* custom_js_realloc(JSMallocState* s, void* ptr, size_t size) {
     if (!tlsf_handle) return nullptr;
     return tlsf_realloc(tlsf_handle, ptr, size);
 }
