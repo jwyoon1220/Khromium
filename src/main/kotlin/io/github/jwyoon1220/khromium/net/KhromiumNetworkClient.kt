@@ -45,7 +45,7 @@ class KhromiumNetworkClient(
             val connection = openConnection(currentUrl, request)
             try {
                 val status    = connection.responseCode
-                logger.info("{} respond {} OK", currentUrl, status)
+                logger.info("{} responded {} OK", currentUrl, status)
                 val headers   = connection.headerFields.filterKeys { it != null }
                 val mimeType  = parseMimeType(connection.contentType ?: "text/html")
                 val charset   = parseCharset(connection.contentType ?: "text/html")
