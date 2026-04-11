@@ -15,16 +15,8 @@ if (-not (Test-Path "$BUILD_DIR\tlsf")) {
 }
 
 if (-not (Test-Path "$BUILD_DIR\quickjs")) {
-    Write-Host "Cloning QuickJS..." -ForegroundColor Cyan
-    git clone https://github.com/bellard/quickjs.git "$BUILD_DIR\quickjs"
-    
-    $qjsc = "$BUILD_DIR\quickjs\quickjs.c"
-    if (Test-Path $qjsc) {
-        Write-Host "Patching quickjs.c for Windows compatibility..." -ForegroundColor Yellow
-        $content = Get-Content $qjsc -Raw
-        $content = $content -replace '#define CONFIG_ATOMICS', '/* #define CONFIG_ATOMICS */'
-        Set-Content $qjsc $content -NoNewline
-    }
+    Write-Host "Cloning QuickJS-NG..." -ForegroundColor Cyan
+    git clone https://github.com/quickjs-ng/quickjs.git "$BUILD_DIR\quickjs"
 }
 
 # 3. JAVA_HOME 확인 및 JNI 경로 설정
@@ -73,7 +65,10 @@ $CLANG_ARGS += "`"$BUILD_DIR\quickjs\quickjs.c`""
 $CLANG_ARGS += "`"$BUILD_DIR\quickjs\libunicode.c`""
 $CLANG_ARGS += "`"$BUILD_DIR\quickjs\libregexp.c`""
 $CLANG_ARGS += "`"$BUILD_DIR\quickjs\cutils.c`""
-$CLANG_ARGS += "`"$BUILD_DIR\quickjs\dtoa.c`""
+# dtoa.c was merged into quickjs.c in quickjs-ng; only add it if it exists
+if (Test-Path "$BUILD_DIR\quickjs\dtoa.c") {
+    $CLANG_ARGS += "`"$BUILD_DIR\quickjs\dtoa.c`""
+}
 
 # 7. 런타임 설정
 $CLANG_ARGS += "-rtlib=compiler-rt"
