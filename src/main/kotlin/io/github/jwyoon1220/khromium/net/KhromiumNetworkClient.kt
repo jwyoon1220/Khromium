@@ -1,5 +1,6 @@
 package io.github.jwyoon1220.khromium.net
 
+import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URI
@@ -27,6 +28,8 @@ class KhromiumNetworkClient(
     val maxBodyBytes: Int = 64 * 1024 * 1024 // 64 MB cap
 ) {
 
+    private val logger = LoggerFactory.getLogger(KhromiumNetworkClient::class.java)
+
     /**
      * Fetches [request] and returns the [KhromiumResponse].
      *
@@ -38,9 +41,11 @@ class KhromiumNetworkClient(
         var redirectsLeft = maxRedirects
 
         while (true) {
+            logger.info("Connect {}", currentUrl)
             val connection = openConnection(currentUrl, request)
             try {
                 val status    = connection.responseCode
+                logger.info("{} responded {} OK", currentUrl, status)
                 val headers   = connection.headerFields.filterKeys { it != null }
                 val mimeType  = parseMimeType(connection.contentType ?: "text/html")
                 val charset   = parseCharset(connection.contentType ?: "text/html")

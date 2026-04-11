@@ -1,6 +1,7 @@
 package io.github.jwyoon1220.khromium.core
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap
+import org.slf4j.LoggerFactory
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -25,6 +26,10 @@ class OpaqueHandleManager<T : Any> {
 
     private val nextHandle  = AtomicInteger(1)
     private val handleTable = Int2ObjectOpenHashMap<HandleEntry<T>>()
+
+    companion object {
+        private val log = LoggerFactory.getLogger(OpaqueHandleManager::class.java)
+    }
 
     private data class HandleEntry<T>(
         val resource: T,
@@ -53,12 +58,21 @@ class OpaqueHandleManager<T : Any> {
     @Synchronized
     fun resolve(handle: Int, callerTabId: String): T {
         val entry = handleTable[handle]
-            ?: throw SecurityBreachException(
+        if (entry == null) {
+            log.warn("SECURITY: Unknown handle {} requested by tab '{}' — possible handle-forging attack.",
+                handle, callerTabId)
+            throw SecurityBreachException(
                 "Unknown handle $handle requested by tab '$callerTabId' — " +
                 "possible handle-forging attack. Tab terminated."
             )
+        }
 
         if (entry.ownerTabId != callerTabId) {
+            log.warn(
+                "SECURITY: Cross-tab handle access — handle {} owned by tab '{}' accessed by tab '{}'. " +
+                "Potential tab-escape attempt. Tab terminated.",
+                handle, entry.ownerTabId, callerTabId
+            )
             throw SecurityBreachException(
                 "Cross-tab handle access: handle $handle owned by tab '${entry.ownerTabId}' " +
                 "but accessed by tab '$callerTabId' — potential tab-escape attempt. Tab terminated."
@@ -77,6 +91,10 @@ class OpaqueHandleManager<T : Any> {
         val entry = handleTable[handle] ?: return
 
         if (entry.ownerTabId != callerTabId) {
+            log.warn(
+                "SECURITY: Cross-tab handle release — handle {} owned by '{}', released by '{}'.",
+                handle, entry.ownerTabId, callerTabId
+            )
             throw SecurityBreachException(
                 "Cross-tab handle release: handle $handle owned by '${entry.ownerTabId}', " +
                 "released by '${callerTabId}'."

@@ -1,5 +1,6 @@
 package io.github.jwyoon1220.khromium.core
 
+import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -24,6 +25,7 @@ class FaultRetryPolicy(
     companion object {
         const val MAX_RETRIES = 5
         const val BASE_DELAY_MS = 1L
+        private val log = LoggerFactory.getLogger(FaultRetryPolicy::class.java)
     }
 
     // Tracks consecutive failure count per virtual page (vAddr / PAGE_SIZE).
@@ -57,6 +59,11 @@ class FaultRetryPolicy(
                 val total = counter.incrementAndGet()
                 if (total >= maxRetries) {
                     failureCounters.remove(pageKey)
+                    log.warn(
+                        "SECURITY: Tab '{}' address 0x{} failed {} consecutive translations — " +
+                        "potential heap-spray/use-after-free. Tab terminated.",
+                        tabId, vAddr.toString(16), total
+                    )
                     throw SecurityBreachException(
                         "Tab '$tabId': address 0x${vAddr.toString(16)} failed $total consecutive " +
                         "translations — potential heap-spray / use-after-free attack. " +

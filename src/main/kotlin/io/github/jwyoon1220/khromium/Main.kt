@@ -5,6 +5,7 @@ import io.github.jwyoon1220.khromium.dom.*
 import io.github.jwyoon1220.khromium.js.*
 import io.github.jwyoon1220.khromium.net.KhromiumNetworkClient
 import io.github.jwyoon1220.khromium.ui.BrowserTab
+import com.formdev.flatlaf.FlatDarkLaf
 import java.awt.*
 import java.awt.event.ActionEvent
 import javax.swing.*
@@ -262,6 +263,8 @@ fun main() {
     val networkClient = KhromiumNetworkClient()
 
     // ── Swing UI ──────────────────────────────────────────────────────────────
+    // Modern dark look-and-feel (FlatLaf — same family as IntelliJ/Minecraft tooling)
+    FlatDarkLaf.setup()
     // Attempt to enable OpenGL acceleration; ignored if unavailable on this platform
     runCatching { System.setProperty("sun.java2d.opengl", "true") }
     SwingUtilities.invokeLater {

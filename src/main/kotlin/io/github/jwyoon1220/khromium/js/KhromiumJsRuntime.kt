@@ -2,6 +2,7 @@ package io.github.jwyoon1220.khromium.js
 
 import io.github.jwyoon1220.khromium.core.KProcess
 import io.github.jwyoon1220.khromium.core.SecurityBreachException
+import org.slf4j.LoggerFactory
 import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -37,6 +38,7 @@ class KhromiumJsRuntime(
         // Shared engine – the underlying runtime is a process-wide singleton.
         private val engine: KhromiumScriptEngine = selectEngine()
         private val refCount = AtomicInteger(0)
+        private val log = LoggerFactory.getLogger(KhromiumJsRuntime::class.java)
 
         /** Picks QuickJSEngine if the native library is available, else falls back to Nashorn. */
         private fun selectEngine(): KhromiumScriptEngine {
@@ -100,6 +102,8 @@ class KhromiumJsRuntime(
             sharedCache.putCache(hash, result)
             result
         } catch (e: SecurityBreachException) {
+            log.error("SECURITY: Tab '{}' — SecurityBreachException during JS execution. " +
+                "Destroying tab VMM. Cause: {}", tabId, e.message)
             close()
             throw e
         }

@@ -1,0 +1,46 @@
+<configuration>
+
+    <!-- ── Console appender (Minecraft Fabric style) ─────────────────────── -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>[%d{HH:mm:ss}] [%t/%level] (%logger{1}): %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ── Rolling file appender – all logs ──────────────────────────────── -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/khromium.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/khromium.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>7</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>[%d{yyyy-MM-dd HH:mm:ss.SSS}] [%t/%level] (%logger{1}): %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ── Security-event log – WARN and above only ───────────────────────
+         Captures: canary corruption, handle forgery, cookie domain mismatch,
+         retry exhaustion, tab-breach termination.
+    ──────────────────────────────────────────────────────────────────────── -->
+    <appender name="SECURITY_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/security.log</file>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>WARN</level>
+        </filter>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/security.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>[%d{yyyy-MM-dd HH:mm:ss.SSS}] [%t/%level] (%logger{1}): %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+        <appender-ref ref="SECURITY_FILE"/>
+    </root>
+
+</configuration>
