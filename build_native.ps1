@@ -18,7 +18,6 @@ if (-not (Test-Path "$BUILD_DIR\quickjs")) {
     Write-Host "Cloning QuickJS..." -ForegroundColor Cyan
     git clone https://github.com/bellard/quickjs.git "$BUILD_DIR\quickjs"
     
-    # Windows/MSVC 환경에서 pthread 누락으로 인한 빌드 실패 방지 패치
     $qjsc = "$BUILD_DIR\quickjs\quickjs.c"
     if (Test-Path $qjsc) {
         Write-Host "Patching quickjs.c for Windows compatibility..." -ForegroundColor Yellow
@@ -28,67 +27,76 @@ if (-not (Test-Path "$BUILD_DIR\quickjs")) {
     }
 }
 
-# 3. JAVA_HOME 확인
+# 3. JAVA_HOME 확인 및 JNI 경로 설정
 $V_JAVA_HOME = $env:JAVA_HOME
 if (-not $V_JAVA_HOME) {
     $javac = Get-Command javac -ErrorAction SilentlyContinue
     if ($javac) { $V_JAVA_HOME = (Get-Item $javac.Path).Directory.Parent.FullName }
 }
 
-if (-not $V_JAVA_HOME) {
-    Write-Error "JAVA_HOME is not set and could not be guessed."
-    exit 1
-}
+# 공백 대응을 위해 경로를 인용부호로 감쌉니다.
+$JNI_INC = "`"$V_JAVA_HOME\include`""
+$JNI_WIN_INC = "`"$V_JAVA_HOME\include\win32`""
 
-$JNI_INC = "$V_JAVA_HOME\include"
-$JNI_WIN_INC = "$V_JAVA_HOME\include\win32"
-$Q_JNI_INC = "`"$JNI_INC`""
-$Q_JNI_WIN_INC = "`"$JNI_WIN_INC`""
-
-Write-Host "Using JNI Includes: $JNI_INC" -ForegroundColor Green
+Write-Host "Using JNI Includes: $V_JAVA_HOME\include" -ForegroundColor Green
 
 # 4. 컴파일러 설정 및 소스 파일 수집
 $CLANG_CMD = "clang++"
 $CPP_FILES = Get-ChildItem -Path $CPP_DIR -Filter "*.cpp" | Select-Object -ExpandProperty FullName
 
 # 5. 컴파일 인자 구성
-# 주의: CONFIG_VERSION의 따옴표 처리를 위해 ' '와 " "를 조합합니다.
+# 인자에 공백이 포함될 경우를 대비해 탭이나 공백 처리를 Clang 인자 형식에 맞게 조정
 $CLANG_ARGS = @(
     "-shared",
-    "-o", "$BUILD_DIR\KhromiumCore.dll",
-    "-I$Q_JNI_INC",
-    "-I$Q_JNI_WIN_INC",
-    "-I", "$BUILD_DIR\tlsf",
-    "-I", "$BUILD_DIR\quickjs",
-    "-I", "$CPP_DIR",
+    "-o", "`"$BUILD_DIR\KhromiumCore.dll`"",
+    "-I$JNI_INC",
+    "-I$JNI_WIN_INC",
+    "-I`"$BUILD_DIR\tlsf`"",
+    "-I`"$BUILD_DIR\quickjs`"",
+    "-I`"$CPP_DIR`"",
     "-D_GNU_SOURCE",
     "-DCONFIG_WIN32",
     "-DWIN32",
     "-D_CRT_SECURE_NO_WARNINGS",
-    "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
+    "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH",
+    "-fms-extensions",
+    "-m64"
 )
 
-# 6. 소스 파일 추가 (언어 모드 명시)
-# C++ 프로젝트 파일들
+# 6. 언어 모드 및 소스 파일 추가
 $CLANG_ARGS += "-x", "c++"
-$CLANG_ARGS += $CPP_FILES
+foreach($file in $CPP_FILES) { $CLANG_ARGS += "`"$file`"" }
 
-# C 라이브러리 파일들 (TLSF & QuickJS)
 $CLANG_ARGS += "-x", "c"
-$CLANG_ARGS += "$BUILD_DIR\tlsf\tlsf.c"
-$CLANG_ARGS += "$BUILD_DIR\quickjs\quickjs.c"
-$CLANG_ARGS += "$BUILD_DIR\quickjs\libunicode.c"
-$CLANG_ARGS += "$BUILD_DIR\quickjs\libregexp.c"
-$CLANG_ARGS += "$BUILD_DIR\quickjs\cutils.c"
-$CLANG_ARGS += "$BUILD_DIR\quickjs\dtoa.c"
+$CLANG_ARGS += "`"$BUILD_DIR\tlsf\tlsf.c`""
+$CLANG_ARGS += "`"$BUILD_DIR\quickjs\quickjs.c`""
+$CLANG_ARGS += "`"$BUILD_DIR\quickjs\libunicode.c`""
+$CLANG_ARGS += "`"$BUILD_DIR\quickjs\libregexp.c`""
+$CLANG_ARGS += "`"$BUILD_DIR\quickjs\cutils.c`""
+$CLANG_ARGS += "`"$BUILD_DIR\quickjs\dtoa.c`""
 
-# 7. 런타임 라이브러리 설정
+# 7. 런타임 설정
 $CLANG_ARGS += "-rtlib=compiler-rt"
 
 Write-Host "Compiling native DLL..." -ForegroundColor Cyan
-$process = Start-Process -NoNewWindow -Wait -FilePath $CLANG_CMD -ArgumentList $CLANG_ARGS -PassThru -RedirectStandardError "$BUILD_DIR\clang.err" -RedirectStandardOutput "$BUILD_DIR\clang.out"
-if ($process.ExitCode -ne 0) {
-    Write-Error "Clang compilation failed with exit code ($process.ExitCode). See clang.err for details."
+
+# 로그 파일 초기화
+"" | Out-File -FilePath "$BUILD_DIR\clang.err"
+
+# Start-Process 대신 호출 연산자(&)를 사용하여 인자 전달 문제를 회피합니다.
+$argString = $CLANG_ARGS -join " "
+try {
+    # 직접 문자열로 인자를 전달하여 공백 문제를 해결
+    cmd /c "$CLANG_CMD $argString 2> `"$BUILD_DIR\clang.err`" 1> `"$BUILD_DIR\clang.out`""
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Exit code $LASTEXITCODE"
+    }
+} catch {
+    $errorMessage = Get-Content "$BUILD_DIR\clang.err" -Raw
+    Write-Host "--------------------------------------------" -ForegroundColor Red
+    Write-Host "Clang compilation failed." -ForegroundColor Red
+    Write-Host "Error Details:`n$errorMessage" -ForegroundColor Yellow
     exit 1
 }
 
